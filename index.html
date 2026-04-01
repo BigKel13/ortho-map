@@ -185,6 +185,8 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   <button class="f-btn" onclick="openAddPractice()" style="margin-left:8px;background:var(--accent);border-color:var(--accent);color:white">+ Add Practice</button>
   <button class="f-btn" onclick="exportData()" style="margin-left:4px">Export CSV</button>
   <button class="f-btn" onclick="showRoute()" style="margin-left:4px">Route</button>
+  <button class="f-btn" onclick="syncNow()" id="sync-btn" style="margin-left:4px" title="Sync data across devices">⟳ Sync</button>
+  <span id="sync-status" style="font-size:.65rem;color:var(--text3);margin-left:4px"></span>
 </div>
 
 <!-- LAYOUT -->
@@ -504,11 +506,14 @@ loadCustomPractices().forEach(cp=>{
 // STATE
 // ═══════════════════════════════════════
 const STORAGE='amigo-ortho-map-v2';
+const CLOUD_URL='https://jsonblob.com/api/jsonBlob/019d4aad-39b0-7fdf-93a2-fdc07aba266e';
 let state={};
 let routeList=[];
 let selectedId=null;
 let markers={};
 let activeRegion='all';
+let syncTimer=null;
+let lastSyncTime=0;
 
 // Anchor points
 const ANCHORS={
@@ -516,10 +521,97 @@ const ANCHORS={
   home:{lat:40.7476,lng:-74.0507,label:'Home (07307)',color:'#ec4899'}
 };
 
-function loadState(){const s=localStorage.getItem(STORAGE);if(s)try{state=JSON.parse(s)}catch(e){state={}}
+function loadState(){
+  const s=localStorage.getItem(STORAGE);
+  if(s)try{state=JSON.parse(s)}catch(e){state={}}
   PRACTICES.forEach(p=>{if(!state[p.id])state[p.id]={status:'new',notes:'',lastContact:'',nextFollowUp:'',visits:[]}});
 }
-function saveState(){localStorage.setItem(STORAGE,JSON.stringify(state))}
+
+function saveState(){
+  // Add timestamp to track when state was last modified
+  state._lastModified=Date.now();
+  localStorage.setItem(STORAGE,JSON.stringify(state));
+  // Debounced cloud push — waits 2s after last change before syncing
+  if(syncTimer)clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>pushToCloud(),2000);
+}
+
+function setSyncStatus(msg,color){
+  const el=document.getElementById('sync-status');
+  if(el){el.textContent=msg;el.style.color=color||'var(--text3)'}
+}
+
+async function pushToCloud(){
+  try{
+    setSyncStatus('Saving...','var(--yellow)');
+    const payload={state,customPractices:loadCustomPractices(),_lastModified:Date.now()};
+    await fetch(CLOUD_URL,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    lastSyncTime=Date.now();
+    setSyncStatus('Saved ✓','var(--green)');
+    setTimeout(()=>setSyncStatus(''),3000);
+  }catch(e){
+    setSyncStatus('Save failed','var(--red)');
+  }
+}
+
+async function pullFromCloud(){
+  try{
+    setSyncStatus('Syncing...','var(--yellow)');
+    const resp=await fetch(CLOUD_URL);
+    const data=await resp.json();
+    if(!data||data._init)return; // empty/init blob
+    // Merge cloud state — cloud wins for any practice with newer modification
+    if(data.state){
+      const cloudMod=data._lastModified||0;
+      const localMod=state._lastModified||0;
+      // Merge per-practice: take whichever has more data (notes, visits, status changes)
+      Object.keys(data.state).forEach(id=>{
+        if(id==='_lastModified')return;
+        const cloud=data.state[id];
+        const local=state[id];
+        if(!local){state[id]=cloud;return}
+        // If cloud has a more advanced status or more visits, prefer cloud
+        const statusOrder={new:0,reached:1,engaged:2,visited:3,active:4,declined:5};
+        const cloudScore=(statusOrder[cloud.status]||0)+(cloud.visits||[]).length+(cloud.notes?1:0);
+        const localScore=(statusOrder[local.status]||0)+(local.visits||[]).length+(local.notes?1:0);
+        if(cloudScore>localScore){state[id]=cloud}
+        // Merge visits arrays (union of unique dates)
+        if(cloud.visits&&local.visits){
+          const allVisits=[...new Set([...local.visits,...cloud.visits])].sort();
+          state[id].visits=allVisits;
+        }
+        // Keep the longer notes
+        if(cloud.notes&&cloud.notes.length>(local.notes||'').length){state[id].notes=cloud.notes}
+      });
+      // Load cloud custom practices
+      if(data.customPractices&&data.customPractices.length>0){
+        const existing=loadCustomPractices();
+        const existingIds=new Set(existing.map(p=>p.id));
+        data.customPractices.forEach(cp=>{
+          if(!existingIds.has(cp.id)){
+            existing.push(cp);
+            if(!PRACTICES.find(p=>p.id===cp.id)){cp._custom=true;PRACTICES.push(cp)}
+          }
+        });
+        saveCustomPractices(existing);
+      }
+      PRACTICES.forEach(p=>{if(!state[p.id])state[p.id]={status:'new',notes:'',lastContact:'',nextFollowUp:'',visits:[]}});
+      localStorage.setItem(STORAGE,JSON.stringify(state));
+    }
+    lastSyncTime=Date.now();
+    setSyncStatus('Synced ✓','var(--green)');
+    setTimeout(()=>setSyncStatus(''),3000);
+  }catch(e){
+    setSyncStatus('Sync failed','var(--red)');
+  }
+}
+
+async function syncNow(){
+  await pullFromCloud();
+  createMarkers();filterPractices();updateDashboard();updateHeaderStats();
+  if(selectedId)selectPractice(selectedId);
+  await pushToCloud();
+}
 
 // ═══════════════════════════════════════
 // MAP
@@ -975,6 +1067,15 @@ filterPractices();
 updateDashboard();
 updateHeaderStats();
 renderRoute();
+// Pull cloud data on load, then refresh UI
+pullFromCloud().then(()=>{
+  createMarkers();filterPractices();updateDashboard();updateHeaderStats();
+});
+// Auto-sync every 60 seconds
+setInterval(async()=>{
+  await pullFromCloud();
+  createMarkers();filterPractices();updateDashboard();updateHeaderStats();
+},60000);
 </script>
 </body>
 </html>
