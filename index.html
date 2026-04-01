@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Amigo Ortho Sales Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+:root{
+  --bg:#0f172a;--card:#1e293b;--card2:#334155;--border:#475569;
+  --accent:#6366f1;--accent2:#818cf8;--accent-light:#c7d2fe;
+  --green:#22c55e;--green-bg:rgba(34,197,94,.15);
+  --yellow:#eab308;--yellow-bg:rgba(234,179,8,.15);
+  --orange:#f97316;--orange-bg:rgba(249,115,22,.15);
+  --red:#ef4444;--red-bg:rgba(239,68,68,.15);
+  --blue:#3b82f6;--blue-bg:rgba(59,130,246,.15);
+  --purple:#a855f7;--purple-bg:rgba(168,85,247,.15);
+  --teal:#14b8a6;--teal-bg:rgba(20,184,166,.15);
+  --pink:#ec4899;
+  --text:#f1f5f9;--text2:#94a3b8;--text3:#64748b;
+  --radius:12px;--shadow:0 4px 20px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* HEADER */
+.header{background:var(--card);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:16px;z-index:1000;flex-shrink:0}
+.logo{font-size:1.1rem;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap}
+.header-stats{display:flex;gap:12px;margin-left:auto;flex-shrink:0}
+.h-stat{text-align:center;padding:2px 10px}
+.h-stat .num{font-size:1.1rem;font-weight:800;line-height:1}
+.h-stat .lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)}
+
+/* LAYOUT */
+.layout{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{width:380px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.sidebar-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.s-tab{flex:1;padding:10px 4px;text-align:center;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;border-bottom:2px solid transparent;color:var(--text3);transition:all .2s;background:none;border-top:none;border-left:none;border-right:none}
+.s-tab.active{color:var(--accent2);border-bottom-color:var(--accent)}
+.s-tab:hover{color:var(--text)}
+.s-panel{display:none;flex:1;overflow-y:auto;overflow-x:hidden}
+.s-panel.active{display:flex;flex-direction:column}
+
+/* FILTERS */
+.filters{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.filter-row{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.filter-row:last-child{margin-bottom:0}
+.f-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font-size:.78rem;outline:none;font-family:inherit;min-width:0}
+.f-input:focus{border-color:var(--accent)}
+.f-select{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);font-size:.75rem;outline:none;cursor:pointer;font-family:inherit}
+.f-btn{padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text2);font-size:.7rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit}
+.f-btn.active{background:var(--accent);border-color:var(--accent);color:white}
+.f-btn:hover{border-color:var(--accent);color:var(--text)}
+
+/* PRACTICE LIST */
+.practice-list{flex:1;overflow-y:auto;padding:4px}
+.p-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin:4px 8px;cursor:pointer;transition:all .15s;position:relative}
+.p-card:hover{border-color:var(--accent);transform:translateX(2px)}
+.p-card.selected{border-color:var(--accent);background:rgba(99,102,241,.1)}
+.p-card .p-name{font-size:.82rem;font-weight:700;margin-bottom:2px;padding-right:24px}
+.p-card .p-addr{font-size:.7rem;color:var(--text2);margin-bottom:4px}
+.p-card .p-meta{display:flex;gap:6px;flex-wrap:wrap}
+.p-tag{font-size:.6rem;font-weight:600;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.04em}
+.tag-nyc{background:var(--blue-bg);color:var(--blue)}
+.tag-nj{background:var(--green-bg);color:var(--green)}
+.tag-ct{background:var(--purple-bg);color:var(--purple)}
+.tag-emr{background:var(--teal-bg);color:var(--teal)}
+.tag-docs{background:rgba(255,255,255,.08);color:var(--text2)}
+
+/* STATUS BADGES */
+.status-dot{width:10px;height:10px;border-radius:50%;position:absolute;right:10px;top:12px;border:2px solid var(--card)}
+.status-new{background:#64748b}
+.status-reached{background:var(--yellow)}
+.status-engaged{background:var(--orange)}
+.status-visited{background:var(--blue)}
+.status-active{background:var(--green)}
+.status-declined{background:var(--red)}
+
+/* DETAIL PANEL */
+.detail-panel{padding:12px;overflow-y:auto;flex:1}
+.dp-name{font-size:1rem;font-weight:800;margin-bottom:4px}
+.dp-addr{font-size:.82rem;color:var(--text2);margin-bottom:8px}
+.dp-section{margin-bottom:12px}
+.dp-section h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px;font-weight:700}
+.dp-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:.8rem}
+.dp-row .label{color:var(--text2)}
+.dp-row .value{font-weight:600}
+.dp-row a{color:var(--accent2);text-decoration:none;font-weight:600}
+.dp-row a:hover{text-decoration:underline}
+.dp-status-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:.82rem;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.dp-notes{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:.78rem;resize:vertical;min-height:60px;font-family:inherit;outline:none}
+.dp-notes:focus{border-color:var(--accent)}
+.dp-btn{width:100%;padding:8px;border-radius:8px;border:none;font-weight:700;font-size:.8rem;cursor:pointer;transition:all .15s;font-family:inherit;margin-top:6px}
+.dp-btn-primary{background:var(--accent);color:white}
+.dp-btn-primary:hover{background:var(--accent2)}
+.dp-btn-secondary{background:var(--card2);color:var(--text);border:1px solid var(--border)}
+.dp-btn-secondary:hover{border-color:var(--accent)}
+
+/* ROUTE PLANNER */
+.route-panel{padding:12px;overflow-y:auto;flex:1}
+.route-item{display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:.78rem}
+.route-item .r-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.7rem;flex-shrink:0}
+.route-item .r-info{flex:1}
+.route-item .r-name{font-weight:700}
+.route-item .r-addr{font-size:.68rem;color:var(--text2)}
+.route-item .r-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;padding:0 4px}
+
+/* DASHBOARD PANEL */
+.dash-panel{padding:12px;overflow-y:auto;flex:1}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.dash-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center}
+.dash-card .d-num{font-size:1.6rem;font-weight:900}
+.dash-card .d-lbl{font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-top:2px}
+.dash-bar{margin-bottom:8px}
+.dash-bar-label{display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px}
+.dash-bar-track{height:6px;background:var(--card2);border-radius:3px;overflow:hidden}
+.dash-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+
+/* MAP */
+.map-wrap{flex:1;position:relative}
+#map{width:100%;height:100%}
+
+/* LEGEND */
+.legend{position:absolute;bottom:20px;left:20px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;z-index:900;font-size:.72rem;box-shadow:var(--shadow)}
+.legend h4{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px}
+.legend-item{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* CUSTOM MARKERS */
+.custom-marker{width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white;cursor:pointer;transition:transform .15s}
+.custom-marker:hover{transform:scale(1.2)}
+.anchor-marker{width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px var(--accent),0 2px 12px rgba(99,102,241,.5);background:var(--accent)!important}
+
+/* ADD PRACTICE FORM */
+.add-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.add-form-grid .full{grid-column:1/-1}
+.add-form-grid label{font-size:.7rem;color:var(--text2);display:block;margin-bottom:2px;font-weight:600}
+.add-form-grid input,.add-form-grid select,.add-form-grid textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:.8rem;font-family:inherit;outline:none;box-sizing:border-box}
+.add-form-grid input:focus,.add-form-grid select:focus,.add-form-grid textarea:focus{border-color:var(--accent)}
+.add-form-grid textarea{resize:vertical;min-height:40px}
+.geocode-status{font-size:.7rem;margin-top:6px;padding:6px 10px;border-radius:6px}
+.geocode-ok{background:var(--green-bg);color:var(--green)}
+.geocode-err{background:var(--red-bg);color:var(--red)}
+.geocode-wait{background:var(--yellow-bg);color:var(--yellow)}
+.custom-badge{display:inline-block;font-size:.55rem;font-weight:700;padding:1px 5px;border-radius:3px;background:var(--pink);color:white;margin-left:6px;vertical-align:middle;text-transform:uppercase;letter-spacing:.04em}
+
+/* EXPORT MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow)}
+.modal h3{font-size:1rem;font-weight:800;margin-bottom:12px}
+.modal-close{float:right;background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer}
+.modal pre{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:.72rem;overflow-x:auto;max-height:300px;white-space:pre-wrap;color:var(--text)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .layout{flex-direction:column}
+  .sidebar{width:100%;height:50vh}
+  .map-wrap{height:50vh}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">AMIGO Ortho Map</div>
+  <div class="header-stats">
+    <div class="h-stat"><div class="num" id="hs-total">0</div><div class="lbl">Practices</div></div>
+    <div class="h-stat"><div class="num" id="hs-visited" style="color:var(--blue)">0</div><div class="lbl">Visited</div></div>
+    <div class="h-stat"><div class="num" id="hs-engaged" style="color:var(--orange)">0</div><div class="lbl">Engaged</div></div>
+    <div class="h-stat"><div class="num" id="hs-active" style="color:var(--green)">0</div><div class="lbl">Active</div></div>
+    <div class="h-stat"><div class="num" id="hs-need" style="color:var(--text3)">0</div><div class="lbl">Untouched</div></div>
+  </div>
+  <button class="f-btn" onclick="openAddPractice()" style="margin-left:8px;background:var(--accent);border-color:var(--accent);color:white">+ Add Practice</button>
+  <button class="f-btn" onclick="exportData()" style="margin-left:4px">Export CSV</button>
+  <button class="f-btn" onclick="showRoute()" style="margin-left:4px">Route</button>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="s-tab active" data-panel="list-panel">Practices</button>
+      <button class="s-tab" data-panel="detail-panel-wrap">Details</button>
+      <button class="s-tab" data-panel="route-panel-wrap">Route Plan</button>
+      <button class="s-tab" data-panel="dash-panel-wrap">Dashboard</button>
+    </div>
+
+    <!-- LIST PANEL -->
+    <div class="s-panel active" id="list-panel">
+      <div class="filters">
+        <div class="filter-row">
+          <input class="f-input" type="text" id="search" placeholder="Search practices..." oninput="filterPractices()"/>
+        </div>
+        <div class="filter-row">
+          <button class="f-btn active" data-region="all" onclick="toggleRegion(this)">All</button>
+          <button class="f-btn" data-region="NYC" onclick="toggleRegion(this)">NYC</button>
+          <button class="f-btn" data-region="NJ" onclick="toggleRegion(this)">NJ</button>
+          <button class="f-btn" data-region="CT" onclick="toggleRegion(this)">CT</button>
+        </div>
+        <div class="filter-row">
+          <select class="f-select" id="status-filter" onchange="filterPractices()">
+            <option value="all">All Statuses</option>
+            <option value="new">Not Contacted</option>
+            <option value="reached">Reached Out</option>
+            <option value="engaged">Engaged</option>
+            <option value="visited">Visited</option>
+            <option value="active">Active Relationship</option>
+            <option value="declined">Declined/Not Interested</option>
+          </select>
+          <select class="f-select" id="emr-filter" onchange="filterPractices()">
+            <option value="all">All EMRs</option>
+            <option value="ModMed">ModMed</option>
+            <option value="athenahealth">Athenahealth</option>
+            <option value="eClinicalWorks">eClinicalWorks</option>
+            <option value="NextGen">NextGen</option>
+            <option value="DrChrono">DrChrono</option>
+            <option value="Epic">Epic</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <select class="f-select" id="travel-filter" onchange="filterPractices()">
+            <option value="all">Any Distance</option>
+            <option value="30">Within 30 min</option>
+            <option value="60">Within 1 hour</option>
+            <option value="120">Within 2 hours</option>
+          </select>
+          <select class="f-select" id="anchor-filter" onchange="filterPractices()">
+            <option value="work">From Work (10010)</option>
+            <option value="home">From Home (07307)</option>
+          </select>
+        </div>
+      </div>
+      <div class="practice-list" id="practice-list"></div>
+    </div>
+
+    <!-- DETAIL PANEL -->
+    <div class="s-panel" id="detail-panel-wrap">
+      <div class="detail-panel" id="detail-panel">
+        <p style="color:var(--text3);text-align:center;padding:40px 20px;font-size:.85rem">Select a practice from the list or map to view details</p>
+      </div>
+    </div>
+
+    <!-- ROUTE PANEL -->
+    <div class="s-panel" id="route-panel-wrap">
+      <div class="route-panel" id="route-panel">
+        <h4 style="font-size:.78rem;color:var(--text2);margin-bottom:8px">Half-Day Visit Route Planner</h4>
+        <p style="font-size:.72rem;color:var(--text3);margin-bottom:12px">Click practices on the map or list and press "Add to Route" to build a half-day visit plan (5-6 practices).</p>
+        <div id="route-list"></div>
+        <div style="margin-top:12px" id="route-summary"></div>
+        <button class="dp-btn dp-btn-secondary" onclick="clearRoute()" style="margin-top:8px">Clear Route</button>
+        <button class="dp-btn dp-btn-primary" onclick="exportRoute()" style="margin-top:4px">Export Route</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD PANEL -->
+    <div class="s-panel" id="dash-panel-wrap">
+      <div class="dash-panel" id="dash-panel"></div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="legend">
+      <h4>Status</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div>Not Contacted</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Reached Out</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>Engaged</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Visited</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Active</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Declined</div>
+      <h4 style="margin-top:8px">Anchors</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent);box-shadow:0 0 0 2px var(--accent-light)"></div>Work (10010)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--pink);box-shadow:0 0 0 2px #fbcfe8"></div>Home (07307)</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD PRACTICE MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal" style="max-width:540px">
+    <button class="modal-close" onclick="closeAddModal()">&times;</button>
+    <h3>Add New Practice</h3>
+    <div class="add-form-grid">
+      <div class="full"><label>Practice Name *</label><input id="ap-name" placeholder="e.g. Summit Orthopedics"/></div>
+      <div class="full"><label>Street Address *</label><input id="ap-addr" placeholder="e.g. 123 Main St, Ste 200"/></div>
+      <div><label>City *</label><input id="ap-city" placeholder="e.g. Newark"/></div>
+      <div><label>State *</label>
+        <select id="ap-state"><option value="NY">NY</option><option value="NJ" selected>NJ</option><option value="CT">CT</option></select>
+      </div>
+      <div><label>Zip Code *</label><input id="ap-zip" placeholder="07102"/></div>
+      <div><label>Phone</label><input id="ap-phone" placeholder="(xxx) xxx-xxxx"/></div>
+      <div><label>Region *</label>
+        <select id="ap-region"><option value="NYC">NYC</option><option value="NJ" selected>NJ</option><option value="CT">CT</option></select>
+      </div>
+      <div><label>Borough (NYC only)</label><input id="ap-borough" placeholder="e.g. Manhattan"/></div>
+      <div><label># of Doctors</label><input id="ap-docs" type="number" min="1" value="1"/></div>
+      <div><label>EMR System</label>
+        <select id="ap-emr"><option value="Unknown">Unknown</option><option>ModMed</option><option>athenahealth</option><option>eClinicalWorks</option><option>NextGen</option><option>DrChrono</option><option>Epic</option></select>
+      </div>
+      <div><label>Website</label><input id="ap-website" placeholder="example.com"/></div>
+      <div><label>Independent?</label>
+        <select id="ap-independent"><option value="true">Yes</option><option value="false">No (affiliated)</option></select>
+      </div>
+      <div class="full"><label>Specialties (comma-separated)</label><input id="ap-specialties" placeholder="Sports Medicine, Joint Replacement, Spine"/></div>
+      <div class="full" id="geocode-result"></div>
+      <div class="full" style="margin-top:4px">
+        <button class="dp-btn dp-btn-primary" onclick="geocodeAndAdd()" id="ap-submit-btn">Look Up Address & Add</button>
+        <button class="dp-btn dp-btn-secondary" onclick="closeAddModal()" style="margin-top:4px">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <h3 id="modal-title">Export</h3>
+    <pre id="modal-content"></pre>
+    <button class="dp-btn dp-btn-primary" onclick="copyExport()" style="margin-top:12px">Copy to Clipboard</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// PRACTICE DATA
+// ═══════════════════════════════════════
+const PRACTICES = [
+  // ── NYC: Manhattan ──
+  {id:"nyc-1",name:"Manhattan Orthopedics",addr:"57 W 57th St, 15th Fl",city:"New York",state:"NY",zip:"10019",lat:40.7641,lng:-73.9741,phone:"(212) 289-0700",region:"NYC",borough:"Manhattan",docs:4,specialties:["Sports Medicine","Joint Replacement","Spine"],emr:"Unknown",website:"manhattanorthopedic.com",independent:true},
+  {id:"nyc-2",name:"OrthoManhattan",addr:"485 Madison Ave, 8th Fl",city:"New York",state:"NY",zip:"10022",lat:40.7599,lng:-73.9735,phone:"(212) 537-0700",region:"NYC",borough:"Manhattan",docs:6,specialties:["Sports Medicine","Joint Replacement","Hand","Shoulder"],emr:"Unknown",website:"orthomanhattan.com",independent:true},
+  {id:"nyc-3",name:"Manhattan Orthopedic Care",addr:"102 E 53rd St",city:"New York",state:"NY",zip:"10022",lat:40.7590,lng:-73.9712,phone:"(212) 249-8300",region:"NYC",borough:"Manhattan",docs:3,specialties:["Sports Medicine","Shoulder","Knee"],emr:"Unknown",website:"mocnyc.com",independent:true},
+  {id:"nyc-4",name:"NY Orthopedics",addr:"250 W 57th St, Ste 1410",city:"New York",state:"NY",zip:"10107",lat:40.7654,lng:-73.9818,phone:"(212) 259-0100",region:"NYC",borough:"Manhattan",docs:8,specialties:["Sports Medicine","Joint Replacement","Spine","Hand","Foot/Ankle"],emr:"Unknown",website:"newyorkorthopedics.com",independent:true},
+  {id:"nyc-5",name:"Dr. Jonathan Glashow - ISMOC",addr:"737 Park Ave",city:"New York",state:"NY",zip:"10021",lat:40.7696,lng:-73.9637,phone:"(212) 794-5096",region:"NYC",borough:"Manhattan",docs:2,specialties:["Sports Medicine","Knee","Shoulder","Arthroscopy"],emr:"Unknown",website:"orthopedicsurgeonnyc.com",independent:true},
+  {id:"nyc-6",name:"Century Medical & Dental Center",addr:"827 11th Ave",city:"New York",state:"NY",zip:"10019",lat:40.7688,lng:-73.9914,phone:"(212) 369-5566",region:"NYC",borough:"Manhattan",docs:3,specialties:["General Orthopedics","Sports Medicine"],emr:"Unknown",website:"centurymedicaldental.com",independent:false},
+  {id:"nyc-7",name:"Gramercy Park Orthopedics",addr:"233 E 17th St",city:"New York",state:"NY",zip:"10003",lat:40.7348,lng:-73.9845,phone:"(212) 228-2700",region:"NYC",borough:"Manhattan",docs:3,specialties:["Sports Medicine","Hand","Joint Replacement"],emr:"Unknown",website:"",independent:true},
+  {id:"nyc-8",name:"Downtown Orthopedics",addr:"60 E 8th St",city:"New York",state:"NY",zip:"10003",lat:40.7309,lng:-73.9924,phone:"(212) 813-3333",region:"NYC",borough:"Manhattan",docs:2,specialties:["Sports Medicine","Shoulder","Knee"],emr:"Unknown",website:"",independent:true},
+  {id:"nyc-9",name:"Upper East Side Orthopedics",addr:"1049 Park Ave",city:"New York",state:"NY",zip:"10028",lat:40.7797,lng:-73.9580,phone:"(212) 737-3301",region:"NYC",borough:"Manhattan",docs:4,specialties:["Sports Medicine","Hip","Knee","Shoulder"],emr:"ModMed",website:"",independent:true},
+  {id:"nyc-10",name:"Midtown Orthopedics",addr:"420 Lexington Ave, Ste 2528",city:"New York",state:"NY",zip:"10170",lat:40.7527,lng:-73.9764,phone:"(212) 867-7777",region:"NYC",borough:"Manhattan",docs:3,specialties:["Sports Medicine","Spine","Joint Replacement"],emr:"athenahealth",website:"",independent:true},
+
+  // ── NYC: Brooklyn ──
+  {id:"nyc-11",name:"Brooklyn Premier Orthopedics",addr:"7234 4th Ave",city:"Brooklyn",state:"NY",zip:"11209",lat:40.6335,lng:-74.0270,phone:"(718) 238-6400",region:"NYC",borough:"Brooklyn",docs:4,specialties:["Sports Medicine","Joint Replacement","Spine"],emr:"eClinicalWorks",website:"brooklynpremierortho.com",independent:true},
+  {id:"nyc-12",name:"Atlantic Orthopedics",addr:"2662 Atlantic Ave",city:"Brooklyn",state:"NY",zip:"11207",lat:40.6757,lng:-73.8964,phone:"(718) 272-7272",region:"NYC",borough:"Brooklyn",docs:3,specialties:["General Orthopedics","Fracture Care"],emr:"Unknown",website:"",independent:true},
+  {id:"nyc-13",name:"BayCare Medical Orthopedics",addr:"8500 4th Ave",city:"Brooklyn",state:"NY",zip:"11209",lat:40.6230,lng:-74.0309,phone:"(718) 748-5700",region:"NYC",borough:"Brooklyn",docs:4,specialties:["Sports Medicine","Joint Replacement"],emr:"Unknown",website:"",independent:false},
+  {id:"nyc-14",name:"Orthopedic Associates of Brooklyn",addr:"1910 Nostrand Ave",city:"Brooklyn",state:"NY",zip:"11226",lat:40.6436,lng:-73.9487,phone:"(718) 469-5400",region:"NYC",borough:"Brooklyn",docs:3,specialties:["Joint Replacement","Fracture Care","Sports Medicine"],emr:"ModMed",website:"",independent:true},
+  {id:"nyc-15",name:"Park Slope Orthopedics",addr:"267 7th Ave",city:"Brooklyn",state:"NY",zip:"11215",lat:40.6697,lng:-73.9808,phone:"(718) 788-5588",region:"NYC",borough:"Brooklyn",docs:2,specialties:["Sports Medicine","Knee","Shoulder"],emr:"Unknown",website:"",independent:true},
+
+  // ── NYC: Queens ──
+  {id:"nyc-16",name:"All Island Orthopaedics",addr:"23-25 31st St, Ste 100",city:"Astoria",state:"NY",zip:"11105",lat:40.7741,lng:-73.9090,phone:"(718) 204-7550",region:"NYC",borough:"Queens",docs:2,specialties:["Shoulder","Knee","Sports Medicine"],emr:"Unknown",website:"allislandortho.com",independent:true},
+  {id:"nyc-17",name:"Ortho MediSys",addr:"85-15 Woodhaven Blvd",city:"Woodhaven",state:"NY",zip:"11421",lat:40.6930,lng:-73.8569,phone:"(718) 206-7001",region:"NYC",borough:"Queens",docs:6,specialties:["Foot/Ankle","Sports Medicine","Trauma"],emr:"Unknown",website:"orthomedisys.org",independent:true},
+  {id:"nyc-18",name:"Cross Bay Orthopedics",addr:"159-05 Cross Bay Blvd",city:"Howard Beach",state:"NY",zip:"11414",lat:40.6575,lng:-73.8434,phone:"(718) 835-0100",region:"NYC",borough:"Queens",docs:3,specialties:["General Orthopedics","Sports Medicine"],emr:"Unknown",website:"crossbayorthopedics.com",independent:true},
+  {id:"nyc-19",name:"EMU Health Orthopedics",addr:"69-49 Myrtle Ave",city:"Glendale",state:"NY",zip:"11385",lat:40.7012,lng:-73.8792,phone:"(718) 456-2800",region:"NYC",borough:"Queens",docs:3,specialties:["General Orthopedics","Fracture Care"],emr:"Unknown",website:"emuhealth.com",independent:false},
+  {id:"nyc-20",name:"East Coast Bone & Joint",addr:"86-04 Grand Ave",city:"Jamaica Estates",state:"NY",zip:"11432",lat:40.7176,lng:-73.7928,phone:"(718) 206-4930",region:"NYC",borough:"Queens",docs:2,specialties:["Joint Replacement","Arthroscopy","Fracture Care"],emr:"Unknown",website:"ecboneandjoint.com",independent:true},
+
+  // ── NYC: Bronx ──
+  {id:"nyc-21",name:"Bronx Orthopedic Associates",addr:"1200 Waters Pl, Ste 302",city:"Bronx",state:"NY",zip:"10461",lat:40.8515,lng:-73.8437,phone:"(718) 828-1900",region:"NYC",borough:"Bronx",docs:4,specialties:["Sports Medicine","Joint Replacement","Spine"],emr:"Unknown",website:"",independent:true},
+  {id:"nyc-22",name:"Hess Spine & Orthopedics (Bronx)",addr:"1250 Waters Pl, Ste 903",city:"Bronx",state:"NY",zip:"10461",lat:40.8517,lng:-73.8430,phone:"(845) 306-4653",region:"NYC",borough:"Bronx",docs:6,specialties:["Spine","Joint Replacement","Sports Medicine"],emr:"Unknown",website:"hessorthopedics.com",independent:true},
+
+  // ── NYC: Staten Island ──
+  {id:"nyc-23",name:"Staten Island Orthopedic Associates",addr:"4143 Richmond Ave",city:"Staten Island",state:"NY",zip:"10312",lat:40.5517,lng:-74.1678,phone:"(718) 967-5200",region:"NYC",borough:"Staten Island",docs:4,specialties:["Sports Medicine","Joint Replacement","Hand"],emr:"Unknown",website:"",independent:true},
+  {id:"nyc-24",name:"Island Orthopedics & Sports Medicine",addr:"1460 Victory Blvd",city:"Staten Island",state:"NY",zip:"10301",lat:40.6254,lng:-74.1186,phone:"(718) 981-4200",region:"NYC",borough:"Staten Island",docs:3,specialties:["Sports Medicine","Knee","Shoulder"],emr:"eClinicalWorks",website:"",independent:true},
+
+  // ── NYC: Additional from research ──
+  {id:"nyc-25",name:"NY Bone & Joint Specialists",addr:"130 E 67th St",city:"New York",state:"NY",zip:"10065",lat:40.7672,lng:-73.9635,phone:"(212) 759-4553",region:"NYC",borough:"Manhattan",docs:5,specialties:["Shoulder","Knee","Sports Medicine","Spine","Foot/Ankle","Regenerative"],emr:"Unknown",website:"nyboneandjoint.com",independent:true},
+  {id:"nyc-26",name:"RYC Orthopaedics",addr:"55 E 86th St, #1A",city:"New York",state:"NY",zip:"10028",lat:40.7805,lng:-73.9570,phone:"(212) 348-3636",region:"NYC",borough:"Manhattan",docs:2,specialties:["Sports Medicine","Dance Medicine","Knee","Shoulder","Hip"],emr:"Unknown",website:"rycorthopaedics.com",independent:true},
+  {id:"nyc-27",name:"Stuart Springer MD PC",addr:"133 E 58th St, Ste 310",city:"New York",state:"NY",zip:"10022",lat:40.7619,lng:-73.9693,phone:"(212) 813-2543",region:"NYC",borough:"Manhattan",docs:1,specialties:["Sports Medicine","Knee","Shoulder","Ankle"],emr:"Unknown",website:"midtowneastorthopedist.com",independent:true},
+  {id:"nyc-28",name:"NYC Orthopedic Group",addr:"333 E 56th St, Fl 1",city:"New York",state:"NY",zip:"10022",lat:40.7593,lng:-73.9641,phone:"(929) 999-1071",region:"NYC",borough:"Manhattan",docs:2,specialties:["Sports Medicine","Hand","Trauma","Shoulder","Knee"],emr:"Unknown",website:"nycorthopedicgroup.com",independent:true},
+  {id:"nyc-29",name:"Atlantic Orthopedics & Sports Medicine",addr:"489 Atlantic Ave",city:"Brooklyn",state:"NY",zip:"11217",lat:40.6842,lng:-73.9795,phone:"(718) 489-1130",region:"NYC",borough:"Brooklyn",docs:6,specialties:["Sports Medicine","General Orthopedics","Minimally Invasive"],emr:"Unknown",website:"atlanticsportsmed.com",independent:true},
+  {id:"nyc-30",name:"NY Partners Orthopedics",addr:"5318 7th Ave, Ste 1",city:"Brooklyn",state:"NY",zip:"11220",lat:40.6423,lng:-74.0037,phone:"(718) 866-1888",region:"NYC",borough:"Brooklyn",docs:4,specialties:["Joint Replacement","Arthroscopy","Sports Medicine","Foot/Ankle"],emr:"Unknown",website:"nypbone.com",independent:true},
+  {id:"nyc-31",name:"New York Sports & Joints",addr:"125-10 Queens Blvd",city:"Kew Gardens",state:"NY",zip:"11415",lat:40.7052,lng:-73.8275,phone:"(888) 359-1833",region:"NYC",borough:"Queens",docs:6,specialties:["Sports Medicine","Joint Replacement","Hand","Foot/Ankle","Spine"],emr:"Unknown",website:"nysportsandjoints.com",independent:true},
+  {id:"nyc-32",name:"Comprehensive Orthopedic & Spine Care",addr:"6254 97th Pl, Ste 2C",city:"Rego Park",state:"NY",zip:"11374",lat:40.7307,lng:-73.8599,phone:"(718) 313-0766",region:"NYC",borough:"Queens",docs:2,specialties:["Spine Surgery","Shoulder","Knee","Arthroscopy"],emr:"Unknown",website:"comprehensiveorthopediccenter.com",independent:true},
+  {id:"nyc-33",name:"IMC Bone Doc",addr:"108-25 Jamaica Ave",city:"Richmond Hill",state:"NY",zip:"11418",lat:40.6930,lng:-73.8300,phone:"(718) 882-5314",region:"NYC",borough:"Queens",docs:6,specialties:["Knee","Hip","Foot/Ankle","Hand","Shoulder","Spine","Pain"],emr:"Unknown",website:"1888bonedoc.net",independent:true},
+  {id:"nyc-34",name:"iOrtho - The Orthopedic Institute",addr:"82 Lamberts Ln",city:"Staten Island",state:"NY",zip:"10314",lat:40.5978,lng:-74.1527,phone:"(833) 464-6784",region:"NYC",borough:"Staten Island",docs:4,specialties:["Spine","Shoulder","Hand","Knee","Hip","Robotic Surgery"],emr:"Unknown",website:"iorthomd.com",independent:true},
+  {id:"nyc-35",name:"New York Hip and Knee",addr:"1800 Clove Rd",city:"Staten Island",state:"NY",zip:"10304",lat:40.6128,lng:-74.1050,phone:"(718) 727-6945",region:"NYC",borough:"Staten Island",docs:1,specialties:["Hip Replacement","Knee Replacement"],emr:"Unknown",website:"newyorkhipandknee.com",independent:true},
+  {id:"nyc-36",name:"Throgs Neck Multi Care PC",addr:"3058 E Tremont Ave",city:"Bronx",state:"NY",zip:"10461",lat:40.8438,lng:-73.8231,phone:"(718) 568-8577",region:"NYC",borough:"Bronx",docs:2,specialties:["Joint Replacement","Sports Medicine","Arthroscopy"],emr:"Unknown",website:"drlouiscrose.com",independent:true},
+
+  // ── NJ: Hudson County ──
+  {id:"nj-1",name:"Hess Spine & Ortho (Jersey City)",addr:"631 Grand St, Ste 2-100",city:"Jersey City",state:"NJ",zip:"07304",lat:40.7205,lng:-74.0643,phone:"(201) 633-0909",region:"NJ",docs:6,specialties:["Spine","Sports Medicine","Joint Replacement"],emr:"Unknown",website:"hessorthopedics.com",independent:true},
+  {id:"nj-2",name:"Hudson Orthopedics",addr:"136 Newark Ave",city:"Jersey City",state:"NJ",zip:"07302",lat:40.7269,lng:-74.0460,phone:"(201) 432-3200",region:"NJ",docs:3,specialties:["Sports Medicine","Shoulder","Knee"],emr:"athenahealth",website:"",independent:true},
+  {id:"nj-3",name:"Hoboken Orthopedics",addr:"50 Harrison St, Ste 208",city:"Hoboken",state:"NJ",zip:"07030",lat:40.7378,lng:-74.0293,phone:"(201) 222-2272",region:"NJ",docs:2,specialties:["Sports Medicine","General Orthopedics"],emr:"Unknown",website:"",independent:true},
+
+  // ── NJ: Bergen County ──
+  {id:"nj-4",name:"Hess Spine & Ortho (Hackensack)",addr:"19 Kotte Pl",city:"Hackensack",state:"NJ",zip:"07601",lat:40.8822,lng:-74.0426,phone:"(201) 633-8500",region:"NJ",docs:6,specialties:["Spine","Joint Replacement","Sports Medicine"],emr:"Unknown",website:"hessorthopedics.com",independent:true},
+  {id:"nj-5",name:"Garden State Orthopaedic Associates",addr:"22-00 Route 208 S",city:"Fair Lawn",state:"NJ",zip:"07410",lat:40.9266,lng:-74.1190,phone:"(201) 791-6888",region:"NJ",docs:7,specialties:["Sports Medicine","Joint Replacement","Hand","Foot/Ankle"],emr:"ModMed",website:"gardenstate-ortho.com",independent:true},
+  {id:"nj-6",name:"Oradell Orthopedics",addr:"580 Winters Ave",city:"Paramus",state:"NJ",zip:"07652",lat:40.9557,lng:-74.0706,phone:"(201) 261-0800",region:"NJ",docs:3,specialties:["General Orthopedics","Sports Medicine"],emr:"Unknown",website:"",independent:true},
+  {id:"nj-7",name:"Hess Spine & Ortho (Mahwah)",addr:"10 Franklin Tpk",city:"Mahwah",state:"NJ",zip:"07430",lat:41.0826,lng:-74.1588,phone:"(201) 255-5556",region:"NJ",docs:6,specialties:["Sports Medicine","Spine"],emr:"Unknown",website:"hessorthopedics.com",independent:true},
+
+  // ── NJ: Essex County ──
+  {id:"nj-8",name:"Montclair Orthopedic Group",addr:"200 Highland Ave",city:"Glen Ridge",state:"NJ",zip:"07028",lat:40.8038,lng:-74.2009,phone:"(973) 746-2200",region:"NJ",docs:5,specialties:["Sports Medicine","Joint Replacement","Spine"],emr:"athenahealth",website:"",independent:true},
+  {id:"nj-9",name:"Rothman Ortho (Livingston)",addr:"111 Eisenhower Pkwy",city:"Livingston",state:"NJ",zip:"07039",lat:40.7833,lng:-74.3284,phone:"(973) 994-0022",region:"NJ",docs:8,specialties:["Sports Medicine","Joint Replacement","Spine","Hand"],emr:"Epic",website:"rothmanortho.com",independent:false},
+
+  // ── NJ: Passaic County ──
+  {id:"nj-10",name:"Hess Spine & Ortho (Clifton)",addr:"777 Passaic Ave, Ste 575",city:"Clifton",state:"NJ",zip:"07012",lat:40.8640,lng:-74.1415,phone:"(862) 418-4677",region:"NJ",docs:6,specialties:["Sports Medicine","Joint Replacement","Spine"],emr:"Unknown",website:"hessorthopedics.com",independent:true},
+  {id:"nj-11",name:"NJ Orthopaedic Institute (Wayne)",addr:"504 Valley Rd, Ste 200",city:"Wayne",state:"NJ",zip:"07470",lat:40.9466,lng:-74.2450,phone:"(973) 694-2690",region:"NJ",docs:8,specialties:["Sports Medicine","Joint Replacement","Spine Surgery"],emr:"Unknown",website:"njorthoinstitute.com",independent:true},
+
+  // ── NJ: Union County ──
+  {id:"nj-12",name:"Union County Orthopaedic Group (OrthoNJ)",addr:"210 W St Georges Ave",city:"Linden",state:"NJ",zip:"07036",lat:40.6264,lng:-74.2385,phone:"(908) 486-1111",region:"NJ",docs:6,specialties:["Sports Medicine","Joint Replacement","Hand"],emr:"NextGen",website:"unioncountyortho.com",independent:true},
+  {id:"nj-13",name:"Elite Specialty Care (Elizabeth)",addr:"426 Morris Ave",city:"Elizabeth",state:"NJ",zip:"07208",lat:40.6701,lng:-74.2115,phone:"(908) 289-5500",region:"NJ",docs:4,specialties:["Spine","Orthopedics","Pain Management"],emr:"Unknown",website:"escdoctors.com",independent:true},
+  {id:"nj-14",name:"Hess Spine & Ortho (Union)",addr:"950 W Chestnut St, Ste 102",city:"Union",state:"NJ",zip:"07083",lat:40.6932,lng:-74.2723,phone:"(908) 300-5559",region:"NJ",docs:6,specialties:["Spine","Joint Replacement"],emr:"Unknown",website:"hessorthopedics.com",independent:true},
+
+  // ── NJ: Morris County ──
+  {id:"nj-15",name:"Tri-County Orthopedics",addr:"90 Millburn Ave",city:"Millburn",state:"NJ",zip:"07041",lat:40.7228,lng:-74.3065,phone:"(973) 379-6767",region:"NJ",docs:5,specialties:["Sports Medicine","Hand","Foot/Ankle"],emr:"ModMed",website:"tricountyortho.com",independent:true},
+  {id:"nj-16",name:"Rothman Ortho (Morristown)",addr:"111 Madison Ave",city:"Morristown",state:"NJ",zip:"07960",lat:40.7977,lng:-74.4760,phone:"(973) 867-1090",region:"NJ",docs:8,specialties:["Sports Medicine","Joint Replacement","Spine"],emr:"Epic",website:"rothmanortho.com",independent:false},
+
+  // ── NJ: Middlesex County ──
+  {id:"nj-17",name:"Central Jersey Orthopedic Group",addr:"55 US-1",city:"New Brunswick",state:"NJ",zip:"08901",lat:40.4849,lng:-74.4516,phone:"(732) 249-1010",region:"NJ",docs:5,specialties:["Sports Medicine","Joint Replacement","Trauma"],emr:"eClinicalWorks",website:"",independent:true},
+
+  // ── NJ: Monmouth County ──
+  {id:"nj-18",name:"Shore Orthopaedic Group",addr:"26 Court St",city:"Freehold",state:"NJ",zip:"07728",lat:40.2596,lng:-74.2716,phone:"(732) 431-1220",region:"NJ",docs:6,specialties:["Sports Medicine","Joint Replacement","Spine"],emr:"ModMed",website:"",independent:true},
+
+  // ── NJ: Secaucus ──
+  {id:"nj-19",name:"City Orthopaedics & Sports Medicine",addr:"1200 Harmon Meadow Blvd",city:"Secaucus",state:"NJ",zip:"07094",lat:40.7830,lng:-74.0580,phone:"(201) 866-0300",region:"NJ",docs:3,specialties:["Sports Medicine","General Orthopedics"],emr:"Unknown",website:"cityorthosports.com",independent:true},
+  {id:"nj-20",name:"Hess Spine & Ortho (Fairfield)",addr:"310 Passaic Ave, Bldg B, Ste 302",city:"Fairfield",state:"NJ",zip:"07004",lat:40.8749,lng:-74.3030,phone:"(973) 718-7898",region:"NJ",docs:6,specialties:["Spine","Joint Replacement"],emr:"Unknown",website:"hessorthopedics.com",independent:true},
+
+  // ── NJ: Additional from research ──
+  {id:"nj-21",name:"The Orthopedic Health Center",addr:"720 Monroe St, Ste C209",city:"Hoboken",state:"NJ",zip:"07030",lat:40.7453,lng:-74.0335,phone:"(201) 596-3730",region:"NJ",docs:2,specialties:["Sports Medicine","Spine","Joint Replacement","Pediatric"],emr:"Unknown",website:"orthohc.com",independent:true},
+  {id:"nj-22",name:"Urquhart Orthopedic Associates",addr:"534 Avenue E, Ste 1B",city:"Bayonne",state:"NJ",zip:"07002",lat:40.6647,lng:-74.1166,phone:"(201) 436-8289",region:"NJ",docs:2,specialties:["Sports Medicine","Joint Replacement","Hand"],emr:"Unknown",website:"urquhartortho.com",independent:true},
+  {id:"nj-23",name:"Hudson Pro Orthopaedics",addr:"1320 Adam St, Unit D",city:"Hoboken",state:"NJ",zip:"07030",lat:40.7485,lng:-74.0298,phone:"(201) 308-6622",region:"NJ",docs:1,specialties:["Sports Medicine","Orthopedic Surgery"],emr:"Unknown",website:"hudsonproortho.com",independent:true},
+  {id:"nj-24",name:"HOPS Institute",addr:"55 Meadowlands Pkwy, Fl 3",city:"Secaucus",state:"NJ",zip:"07094",lat:40.7863,lng:-74.0615,phone:"(844) 300-4677",region:"NJ",docs:3,specialties:["Spine","Sports Medicine","Pain Management"],emr:"Unknown",website:"hopsinstitute.com",independent:true},
+  {id:"nj-25",name:"North Jersey Orthopedic Specialists",addr:"730 Palisade Ave",city:"Teaneck",state:"NJ",zip:"07666",lat:40.8913,lng:-73.9782,phone:"(201) 353-9000",region:"NJ",docs:7,specialties:["Hip/Knee Reconstruction","Spine","Hand","Foot/Ankle","Sports Medicine"],emr:"Unknown",website:"njorthopedics.com",independent:false},
+  {id:"nj-26",name:"Premier Orthopaedics & Sports Medicine",addr:"403 Grand Ave",city:"Englewood",state:"NJ",zip:"07631",lat:40.8920,lng:-73.9734,phone:"(201) 833-9500",region:"NJ",docs:5,specialties:["Sports Medicine","Hand","General Orthopedics"],emr:"Unknown",website:"acespremortho.com",independent:true},
+  {id:"nj-27",name:"Dr. Thomas K. John, MD",addr:"25 Prospect Ave",city:"Hackensack",state:"NJ",zip:"07601",lat:40.8844,lng:-74.0439,phone:"(201) 343-2277",region:"NJ",docs:1,specialties:["Hip Replacement","Knee Replacement","Robotic Surgery (Mako/ROSA)"],emr:"Unknown",website:"thomasjohnmd.com",independent:true},
+  {id:"nj-28",name:"Ridgewood Orthopedic Group (OrthoNJ)",addr:"85 S Maple Ave, 2nd Fl",city:"Ridgewood",state:"NJ",zip:"07450",lat:40.9790,lng:-74.1161,phone:"(201) 445-2830",region:"NJ",docs:6,specialties:["Sports Medicine","Spine","Joint Replacement","Fractures"],emr:"Unknown",website:"ridgewoodortho.com",independent:true},
+  {id:"nj-29",name:"Bellapianta Orthopaedics",addr:"120 Valley Rd, Ste 100",city:"Montclair",state:"NJ",zip:"07042",lat:40.8187,lng:-74.2120,phone:"(201) 490-4333",region:"NJ",docs:1,specialties:["Sports Medicine","Joint Replacement","Trauma"],emr:"Unknown",website:"bellapiantaortho.com",independent:true},
+  {id:"nj-30",name:"Academy Orthopedics",addr:"622 Eagle Rock Ave, Ste 301",city:"West Orange",state:"NJ",zip:"07052",lat:40.7774,lng:-74.2588,phone:"(973) 446-7500",region:"NJ",docs:8,specialties:["Sports Medicine","Joint Replacement","Cartilage Restoration","Arthroscopy"],emr:"Unknown",website:"academyorthopedic.com",independent:true},
+  {id:"nj-31",name:"Modern Orthopaedics of NJ",addr:"72 Route 17 N",city:"Paramus",state:"NJ",zip:"07652",lat:40.9547,lng:-74.0741,phone:"(973) 898-5999",region:"NJ",docs:4,specialties:["Hand","Shoulder","Sports Medicine","Robotic Joint Replacement"],emr:"Unknown",website:"modernorthonj.com",independent:true},
+  {id:"nj-32",name:"Passaic County Orthopaedic Associates",addr:"1011 Clifton Ave, Ste 16",city:"Clifton",state:"NJ",zip:"07013",lat:40.8581,lng:-74.1560,phone:"(973) 458-0772",region:"NJ",docs:1,specialties:["Hip Replacement","Knee Replacement","Robotic Surgery"],emr:"Unknown",website:"",independent:true},
+  {id:"nj-33",name:"Westfield Orthopedic Group",addr:"541 E Broad St",city:"Westfield",state:"NJ",zip:"07090",lat:40.6547,lng:-74.3434,phone:"(908) 232-3879",region:"NJ",docs:3,specialties:["Sports Medicine","Joint Replacement","Hand","Pediatric"],emr:"Unknown",website:"westfieldorthopedicgroup.com",independent:false},
+  {id:"nj-34",name:"Mid Atlantic Orthopedic Associates",addr:"557 Cranbury Rd, Ste 10",city:"East Brunswick",state:"NJ",zip:"08816",lat:40.4287,lng:-74.4156,phone:"(732) 238-8800",region:"NJ",docs:4,specialties:["Hand","Sports Medicine","Spine","Foot/Ankle"],emr:"Unknown",website:"midatlanticorthonj.com",independent:true},
+  {id:"nj-35",name:"Edison-Metuchen Orthopaedic Group",addr:"10 Parsonage Rd, Fl 5",city:"Edison",state:"NJ",zip:"08837",lat:40.5439,lng:-74.3512,phone:"(732) 494-6226",region:"NJ",docs:8,specialties:["Knee","Shoulder","Hand","Spine","Hip","Trauma","Sports Medicine"],emr:"Unknown",website:"emog.net",independent:true},
+  {id:"nj-36",name:"AOSMI (Advanced Ortho & Sports Medicine)",addr:"301 Professional View Dr",city:"Freehold",state:"NJ",zip:"07728",lat:40.2596,lng:-74.2760,phone:"(732) 720-2555",region:"NJ",docs:7,specialties:["Sports Medicine","Spine","Joint Replacement","Hand"],emr:"Unknown",website:"advancedorthosports.com",independent:true},
+  {id:"nj-37",name:"Garden State Orthopaedic (Hoboken)",addr:"33-41 Newark St",city:"Hoboken",state:"NJ",zip:"07030",lat:40.7370,lng:-74.0290,phone:"(201) 791-4434",region:"NJ",docs:7,specialties:["Sports Medicine","Joint Replacement","Foot/Ankle","Spine"],emr:"Unknown",website:"gardenstateortho.com",independent:true},
+
+  // ── CT: Stamford ──
+  {id:"ct-1",name:"OSSM (Orthopaedic Surgery & Sports Medicine)",addr:"1 Blachley Rd",city:"Stamford",state:"CT",zip:"06902",lat:41.0662,lng:-73.5447,phone:"(203) 323-7331",region:"CT",docs:4,specialties:["Hand","Sports Medicine","Foot/Ankle","Trauma"],emr:"Unknown",website:"ossm.net",independent:true},
+  {id:"ct-2",name:"Summit Health / Westmed Ortho (Stamford)",addr:"1281 E Main St",city:"Stamford",state:"CT",zip:"06902",lat:41.0580,lng:-73.5265,phone:"(203) 210-2830",region:"CT",docs:6,specialties:["Spine","Sports Medicine","Hand","Joint Replacement"],emr:"Epic",website:"summithealth.com",independent:false},
+
+  // ── CT: Greenwich ──
+  {id:"ct-3",name:"Greenwich Orthopedics & Sports Medicine",addr:"6 Greenwich Office Park",city:"Greenwich",state:"CT",zip:"06831",lat:41.0683,lng:-73.6341,phone:"(203) 869-1145",region:"CT",docs:3,specialties:["Sports Medicine","Joint Replacement","Shoulder"],emr:"Unknown",website:"",independent:true},
+
+  // ── CT: Norwalk ──
+  {id:"ct-4",name:"Coastal Orthopedics (Norwalk)",addr:"40 Cross St, Ste 300",city:"Norwalk",state:"CT",zip:"06851",lat:41.1121,lng:-73.4161,phone:"(203) 845-2200",region:"CT",docs:5,specialties:["Sports Medicine","Joint Replacement","Hand","Spine"],emr:"athenahealth",website:"",independent:true},
+
+  // ── CT: Danbury ──
+  {id:"ct-5",name:"OrthoConnecticut (Danbury)",addr:"2 Riverview Dr",city:"Danbury",state:"CT",zip:"06810",lat:41.3972,lng:-73.4430,phone:"(203) 797-1500",region:"CT",docs:9,specialties:["Sports Medicine","Joint Replacement","Spine","Hand","Foot/Ankle"],emr:"ModMed",website:"myorthoct.com",independent:true},
+
+  // ── CT: New Haven area ──
+  {id:"ct-6",name:"The Orthopaedic Group (New Haven)",addr:"199 Whitney Ave",city:"New Haven",state:"CT",zip:"06511",lat:41.3147,lng:-72.9223,phone:"(203) 865-6784",region:"CT",docs:6,specialties:["Foot/Ankle","Trauma","Sports Medicine","Joint Replacement"],emr:"Unknown",website:"togct.com",independent:true},
+
+  // ── CT: Fairfield ──
+  {id:"ct-7",name:"Fairfield County Orthopedics",addr:"888 White Plains Rd",city:"Trumbull",state:"CT",zip:"06611",lat:41.2098,lng:-73.2056,phone:"(203) 268-2882",region:"CT",docs:4,specialties:["Sports Medicine","General Orthopedics"],emr:"Unknown",website:"",independent:true},
+
+  // ── CT: Bridgeport ──
+  {id:"ct-8",name:"Bridgeport Orthopedic Associates",addr:"4675 Main St",city:"Bridgeport",state:"CT",zip:"06606",lat:41.2100,lng:-73.2119,phone:"(203) 372-7800",region:"CT",docs:3,specialties:["General Orthopedics","Fracture Care"],emr:"eClinicalWorks",website:"",independent:true},
+
+  // ── CT: Darien / New Canaan ──
+  {id:"ct-9",name:"OSSM (New Canaan)",addr:"166 Cherry St",city:"New Canaan",state:"CT",zip:"06840",lat:41.1455,lng:-73.4964,phone:"(203) 323-7331",region:"CT",docs:4,specialties:["Hand","Sports Medicine","Foot/Ankle","Trauma"],emr:"Unknown",website:"ossm.net",independent:true},
+
+  // ── CT: Shelton / Milford ──
+  {id:"ct-10",name:"Valley Orthopaedic Specialists",addr:"2 Trap Falls Rd, Ste 404",city:"Shelton",state:"CT",zip:"06484",lat:41.2365,lng:-73.0933,phone:"(203) 734-7900",region:"CT",docs:7,specialties:["Joint Replacement","Hand","Foot/Ankle","Pediatric","Sports Medicine"],emr:"Unknown",website:"vosct.com",independent:true},
+
+  // ── CT: Additional from research ──
+  {id:"ct-11",name:"Plancher Orthopaedics & Sports Medicine",addr:"31 River Rd, Ste 102",city:"Cos Cob",state:"CT",zip:"06807",lat:41.0562,lng:-73.5987,phone:"(203) 863-2003",region:"CT",docs:2,specialties:["Sports Medicine","Knee","Shoulder","Hand"],emr:"Unknown",website:"plancherortho.com",independent:true},
+  {id:"ct-12",name:"Orthopaedic Specialists of CT",addr:"60 Old New Milford Rd, Ste 3E",city:"Brookfield",state:"CT",zip:"06804",lat:41.4647,lng:-73.3982,phone:"(203) 775-6205",region:"CT",docs:5,specialties:["Sports Medicine","Joint Replacement","Hand","Trauma"],emr:"Unknown",website:"ctorthopaedic.com",independent:true},
+  {id:"ct-13",name:"Orthopaedics New England",addr:"1579 Straits Tpk, Ste E",city:"Middlebury",state:"CT",zip:"06762",lat:41.5278,lng:-73.1245,phone:"(203) 598-0700",region:"CT",docs:3,specialties:["Hip Replacement (Anterior)","Knee Replacement"],emr:"Unknown",website:"orthonewengland.com",independent:true},
+  {id:"ct-14",name:"OSM Center (Trumbull)",addr:"888 White Plains Rd, Ste 14",city:"Trumbull",state:"CT",zip:"06611",lat:41.2098,lng:-73.2056,phone:"(203) 268-2882",region:"CT",docs:7,specialties:["Sports Medicine","Hand","Joint Replacement","Pain Medicine"],emr:"Unknown",website:"osmcenter.com",independent:true},
+  {id:"ct-15",name:"Comprehensive Orthopaedics",addr:"863 N Main St Ext, Ste 200",city:"Wallingford",state:"CT",zip:"06492",lat:41.4591,lng:-72.8180,phone:"(203) 265-3280",region:"CT",docs:8,specialties:["Hip Replacement (Robotic)","Knee Replacement","Sports Medicine"],emr:"Unknown",website:"comprehensiveorthopaedics.com",independent:true},
+  {id:"ct-16",name:"CT Spine & Orthopedic",addr:"761 Main Ave",city:"Norwalk",state:"CT",zip:"06851",lat:41.1155,lng:-73.4210,phone:"(866) 553-0612",region:"CT",docs:3,specialties:["Spine","Minimally Invasive Spine Surgery"],emr:"Unknown",website:"ctspineandortho.com",independent:true},
+  {id:"ct-17",name:"Stamford Health Ortho Sports Medicine",addr:"75 Holly Hill Ln, Ste 204",city:"Greenwich",state:"CT",zip:"06830",lat:41.0460,lng:-73.6290,phone:"(203) 614-8888",region:"CT",docs:2,specialties:["Sports Medicine"],emr:"Epic",website:"stamfordhealth.org",independent:false},
+  {id:"ct-18",name:"Coastal Orthopedics (OrthoConnecticut)",addr:"761 Main Ave, Ste 115",city:"Norwalk",state:"CT",zip:"06851",lat:41.1121,lng:-73.4161,phone:"(203) 845-2200",region:"CT",docs:9,specialties:["Sports Medicine","Hand","Spine","Joint Replacement","Foot/Ankle"],emr:"athenahealth",website:"coastal.myorthoct.com",independent:true},
+];
+
+// ═══════════════════════════════════════
+// CUSTOM PRACTICES (user-added, persisted in localStorage)
+// ═══════════════════════════════════════
+const CUSTOM_STORAGE='amigo-ortho-custom-practices';
+function loadCustomPractices(){
+  const raw=localStorage.getItem(CUSTOM_STORAGE);
+  if(raw)try{return JSON.parse(raw)}catch(e){return[]}
+  return[];
+}
+function saveCustomPractices(list){localStorage.setItem(CUSTOM_STORAGE,JSON.stringify(list))}
+// Merge custom practices into PRACTICES on load
+loadCustomPractices().forEach(cp=>{
+  if(!PRACTICES.find(p=>p.id===cp.id)){cp._custom=true;PRACTICES.push(cp)}
+});
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+const STORAGE='amigo-ortho-map-v2';
+let state={};
+let routeList=[];
+let selectedId=null;
+let markers={};
+let activeRegion='all';
+
+// Anchor points
+const ANCHORS={
+  work:{lat:40.7394,lng:-73.9826,label:'Work (10010)',color:'#6366f1'},
+  home:{lat:40.7476,lng:-74.0507,label:'Home (07307)',color:'#ec4899'}
+};
+
+function loadState(){const s=localStorage.getItem(STORAGE);if(s)try{state=JSON.parse(s)}catch(e){state={}}
+  PRACTICES.forEach(p=>{if(!state[p.id])state[p.id]={status:'new',notes:'',lastContact:'',nextFollowUp:'',visits:[]}});
+}
+function saveState(){localStorage.setItem(STORAGE,JSON.stringify(state))}
+
+// ═══════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════
+const map=L.map('map',{zoomControl:false}).setView([40.75,-73.95],11);
+L.control.zoom({position:'topright'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'CartoDB',maxZoom:19}).addTo(map);
+
+// Anchor markers
+Object.entries(ANCHORS).forEach(([key,a])=>{
+  const el=document.createElement('div');
+  el.className='custom-marker anchor-marker';
+  el.style.background=a.color;
+  L.marker([a.lat,a.lng],{icon:L.divIcon({className:'',html:el.outerHTML,iconSize:[20,20],iconAnchor:[10,10]})}).addTo(map).bindTooltip(a.label,{permanent:false,direction:'top'});
+});
+
+// Travel radius circles
+let circles=[];
+function drawCircles(){
+  circles.forEach(c=>map.removeLayer(c));circles=[];
+  const anchor=document.getElementById('anchor-filter').value;
+  const a=ANCHORS[anchor];
+  [30,60,120].forEach((mins,i)=>{
+    // Approximate radius: reverse the drive time estimate (use avg 20mph for circle)
+    const miles=mins/60*20;
+    const meters=miles*1609.34;
+    const c=L.circle([a.lat,a.lng],{radius:meters,color:i===0?'#22c55e':i===1?'#eab308':'#ef4444',fillOpacity:0.03,weight:1,dashArray:'5,5'}).addTo(map);
+    circles.push(c);
+  });
+}
+
+const STATUS_COLORS={new:'#64748b',reached:'#eab308',engaged:'#f97316',visited:'#3b82f6',active:'#22c55e',declined:'#ef4444'};
+
+function createMarkers(){
+  Object.values(markers).forEach(m=>map.removeLayer(m));markers={};
+  PRACTICES.forEach(p=>{
+    const st=state[p.id]?.status||'new';
+    const col=STATUS_COLORS[st];
+    const el=`<div class="custom-marker" style="background:${col}" title="${p.name}">${p.docs}</div>`;
+    const m=L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:el,iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map);
+    const tipMi=haversine(ANCHORS.work.lat,ANCHORS.work.lng,p.lat,p.lng);
+    const tipDrv=estDriveMin(tipMi);
+    m.bindTooltip(`<b>${p.name}</b><br>${p.city}, ${p.state}<br>${p.docs} docs &middot; ~${tipDrv} min from work`,{direction:'top'});
+    m.on('click',()=>selectPractice(p.id));
+    m.practiceId=p.id;
+    markers[p.id]=m;
+  });
+}
+
+// ═══════════════════════════════════════
+// SIDEBAR TABS
+// ═══════════════════════════════════════
+document.querySelectorAll('.s-tab').forEach(tab=>{
+  tab.onclick=()=>{
+    document.querySelectorAll('.s-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.s-panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.panel).classList.add('active');
+  };
+});
+
+// ═══════════════════════════════════════
+// PRACTICE LIST
+// ═══════════════════════════════════════
+function renderList(list){
+  const el=document.getElementById('practice-list');
+  if(!list||list.length===0){el.innerHTML='<p style="color:var(--text3);text-align:center;padding:30px;font-size:.82rem">No practices match filters</p>';return}
+  const anchorKey=document.getElementById('anchor-filter').value;
+  const anch=ANCHORS[anchorKey];
+  el.innerHTML=list.map(p=>{
+    const st=state[p.id]?.status||'new';
+    const regionTag=p.region==='NYC'?'tag-nyc':p.region==='NJ'?'tag-nj':'tag-ct';
+    const mi=haversine(anch.lat,anch.lng,p.lat,p.lng);
+    const drv=estDriveMin(mi);
+    return `<div class="p-card ${selectedId===p.id?'selected':''}" onclick="selectPractice('${p.id}')">
+      <div class="status-dot status-${st}"></div>
+      <div class="p-name">${p.name}${p._custom?'<span class="custom-badge">Custom</span>':''}</div>
+      <div class="p-addr">${p.addr}, ${p.city}, ${p.state} ${p.zip}</div>
+      <div class="p-meta">
+        <span class="p-tag ${regionTag}">${p.region}${p.borough?' · '+p.borough:''}</span>
+        <span class="p-tag tag-docs">${p.docs} docs</span>
+        <span class="p-tag" style="background:rgba(255,255,255,.08);color:var(--text2)">~${drv} min</span>
+        ${p.emr!=='Unknown'?`<span class="p-tag tag-emr">${p.emr}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterPractices(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const st=document.getElementById('status-filter').value;
+  const emr=document.getElementById('emr-filter').value;
+  const travel=document.getElementById('travel-filter').value;
+  const anchor=document.getElementById('anchor-filter').value;
+  const a=ANCHORS[anchor];
+
+  let list=PRACTICES.filter(p=>{
+    if(activeRegion!=='all'&&p.region!==activeRegion)return false;
+    if(q&&!p.name.toLowerCase().includes(q)&&!p.city.toLowerCase().includes(q)&&!p.specialties.join(' ').toLowerCase().includes(q))return false;
+    if(st!=='all'&&(state[p.id]?.status||'new')!==st)return false;
+    if(emr!=='all'&&p.emr!==emr)return false;
+    if(travel!=='all'){
+      const miles=haversine(a.lat,a.lng,p.lat,p.lng);
+      const mins=estDriveMin(miles);
+      if(mins>parseFloat(travel))return false;
+    }
+    return true;
+  });
+
+  renderList(list);
+  // Update marker visibility
+  PRACTICES.forEach(p=>{
+    if(markers[p.id]){
+      const visible=list.some(l=>l.id===p.id);
+      markers[p.id].setOpacity(visible?1:0.15);
+    }
+  });
+  drawCircles();
+  updateHeaderStats();
+}
+
+function haversine(lat1,lon1,lat2,lon2){
+  const R=3958.8; // Earth radius in miles
+  const dLat=(lat2-lat1)*Math.PI/180;const dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Estimate drive time in minutes from straight-line miles
+// Uses a 1.4x detour factor for road routing + avg speed based on distance
+function estDriveMin(miles){
+  const roadMiles = miles * 1.4; // roads aren't straight lines
+  // NYC/NJ metro avg speeds: <5mi=15mph, 5-15mi=20mph, 15-30mi=25mph, 30+mi=35mph
+  let avgMph;
+  if(roadMiles<7) avgMph=15;
+  else if(roadMiles<21) avgMph=20;
+  else if(roadMiles<42) avgMph=25;
+  else avgMph=35;
+  return Math.round(roadMiles / avgMph * 60);
+}
+
+function toggleRegion(btn){
+  document.querySelectorAll('[data-region]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activeRegion=btn.dataset.region;
+  filterPractices();
+}
+
+// ═══════════════════════════════════════
+// SELECT & DETAIL
+// ═══════════════════════════════════════
+function selectPractice(id){
+  selectedId=id;
+  const p=PRACTICES.find(x=>x.id===id);
+  if(!p)return;
+  const s=state[id]||{status:'new',notes:'',lastContact:'',nextFollowUp:'',visits:[]};
+  const miles_w=haversine(ANCHORS.work.lat,ANCHORS.work.lng,p.lat,p.lng);
+  const miles_h=haversine(ANCHORS.home.lat,ANCHORS.home.lng,p.lat,p.lng);
+  const drive_w=estDriveMin(miles_w);
+  const drive_h=estDriveMin(miles_h);
+
+  document.getElementById('detail-panel').innerHTML=`
+    <div class="dp-name">${p.name}${p._custom?'<span class="custom-badge">Custom</span>':''}</div>
+    <div class="dp-addr">${p.addr}, ${p.city}, ${p.state} ${p.zip}</div>
+    <div class="dp-section">
+      <h4>Status</h4>
+      <select class="dp-status-select" id="dp-status" onchange="updateStatus('${id}',this.value)">
+        <option value="new" ${s.status==='new'?'selected':''}>Not Contacted</option>
+        <option value="reached" ${s.status==='reached'?'selected':''}>Reached Out</option>
+        <option value="engaged" ${s.status==='engaged'?'selected':''}>Engaged</option>
+        <option value="visited" ${s.status==='visited'?'selected':''}>Visited / Popped By</option>
+        <option value="active" ${s.status==='active'?'selected':''}>Active Relationship</option>
+        <option value="declined" ${s.status==='declined'?'selected':''}>Declined / Not Interested</option>
+      </select>
+    </div>
+    <div class="dp-section">
+      <h4>Practice Info</h4>
+      <div class="dp-row"><span class="label">Phone</span><span class="value">${p.phone}</span></div>
+      <div class="dp-row"><span class="label">Doctors</span><span class="value">${p.docs} surgeons</span></div>
+      <div class="dp-row"><span class="label">Region</span><span class="value">${p.region}${p.borough?' - '+p.borough:''}</span></div>
+      <div class="dp-row"><span class="label">EMR System</span><span class="value">${p.emr}</span></div>
+      <div class="dp-row"><span class="label">Independent</span><span class="value">${p.independent?'Yes':'No (affiliated)'}</span></div>
+      ${p.website?`<div class="dp-row"><span class="label">Website</span><a href="https://${p.website}" target="_blank">${p.website}</a></div>`:''}
+      <div class="dp-row"><span class="label">Specialties</span><span class="value">${p.specialties.join(', ')}</span></div>
+    </div>
+    <div class="dp-section">
+      <h4>Distance</h4>
+      <div class="dp-row"><span class="label">From Work (10010)</span><span class="value">${miles_w.toFixed(1)} mi &middot; ~${drive_w} min drive</span></div>
+      <div class="dp-row"><span class="label">From Home (07307)</span><span class="value">${miles_h.toFixed(1)} mi &middot; ~${drive_h} min drive</span></div>
+    </div>
+    <div class="dp-section">
+      <h4>Contact Log</h4>
+      <div class="dp-row"><span class="label">Last Contact</span><input type="date" class="f-input" style="width:auto" value="${s.lastContact||''}" onchange="updateField('${id}','lastContact',this.value)"/></div>
+      <div class="dp-row"><span class="label">Next Follow-Up</span><input type="date" class="f-input" style="width:auto" value="${s.nextFollowUp||''}" onchange="updateField('${id}','nextFollowUp',this.value)"/></div>
+    </div>
+    <div class="dp-section">
+      <h4>Notes</h4>
+      <textarea class="dp-notes" placeholder="Add notes about this practice..." onchange="updateField('${id}','notes',this.value)">${s.notes||''}</textarea>
+    </div>
+    <button class="dp-btn dp-btn-primary" onclick="addToRoute('${id}')">Add to Route</button>
+    <button class="dp-btn dp-btn-secondary" onclick="logVisit('${id}')">Log Visit Today</button>
+  `;
+
+  // Switch to detail tab
+  document.querySelectorAll('.s-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.s-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('[data-panel="detail-panel-wrap"]').classList.add('active');
+  document.getElementById('detail-panel-wrap').classList.add('active');
+
+  // Center map
+  map.flyTo([p.lat,p.lng],14,{duration:0.5});
+  filterPractices();
+}
+
+function updateStatus(id,val){
+  if(!state[id])state[id]={status:'new',notes:'',lastContact:'',nextFollowUp:'',visits:[]};
+  state[id].status=val;
+  saveState();
+  createMarkers();filterPractices();updateDashboard();updateHeaderStats();
+}
+
+function updateField(id,field,val){
+  if(!state[id])state[id]={status:'new',notes:'',lastContact:'',nextFollowUp:'',visits:[]};
+  state[id][field]=val;saveState();
+}
+
+function logVisit(id){
+  if(!state[id])state[id]={status:'new',notes:'',lastContact:'',nextFollowUp:'',visits:[]};
+  const today=new Date().toISOString().split('T')[0];
+  if(!state[id].visits)state[id].visits=[];
+  state[id].visits.push(today);
+  state[id].lastContact=today;
+  if(state[id].status==='new'||state[id].status==='reached')state[id].status='visited';
+  saveState();
+  selectPractice(id);createMarkers();filterPractices();updateDashboard();updateHeaderStats();
+  alert('Visit logged for today!');
+}
+
+// ═══════════════════════════════════════
+// ROUTE PLANNER
+// ═══════════════════════════════════════
+function addToRoute(id){
+  if(routeList.includes(id))return alert('Already in route!');
+  if(routeList.length>=6)return alert('Max 6 practices per half-day route!');
+  routeList.push(id);
+  renderRoute();
+  // Switch to route tab
+  document.querySelectorAll('.s-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.s-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('[data-panel="route-panel-wrap"]').classList.add('active');
+  document.getElementById('route-panel-wrap').classList.add('active');
+}
+
+function removeFromRoute(id){routeList=routeList.filter(x=>x!==id);renderRoute()}
+function clearRoute(){routeList=[];renderRoute()}
+
+function renderRoute(){
+  const el=document.getElementById('route-list');
+  if(routeList.length===0){el.innerHTML='<p style="color:var(--text3);font-size:.78rem;text-align:center;padding:20px">No practices added yet</p>';document.getElementById('route-summary').innerHTML='';return}
+  el.innerHTML=routeList.map((id,i)=>{
+    const p=PRACTICES.find(x=>x.id===id);
+    return `<div class="route-item"><div class="r-num">${i+1}</div><div class="r-info"><div class="r-name">${p.name}</div><div class="r-addr">${p.city}, ${p.state}</div></div><button class="r-remove" onclick="removeFromRoute('${id}')">&times;</button></div>`;
+  }).join('');
+  // Summary
+  let totalMiles=0;
+  let totalDriveMin=0;
+  for(let i=1;i<routeList.length;i++){
+    const a=PRACTICES.find(x=>x.id===routeList[i-1]);
+    const b=PRACTICES.find(x=>x.id===routeList[i]);
+    const seg=haversine(a.lat,a.lng,b.lat,b.lng);
+    totalMiles+=seg;
+    totalDriveMin+=estDriveMin(seg);
+  }
+  const meetingMin=routeList.length*20; // ~20 min per pop-by
+  const totalMin=totalDriveMin+meetingMin;
+  const totalHrs=Math.floor(totalMin/60);
+  const remainMin=totalMin%60;
+  document.getElementById('route-summary').innerHTML=`<div style="font-size:.78rem;color:var(--text2)"><strong>${routeList.length}</strong> stops &middot; ~<strong>${totalMiles.toFixed(1)}</strong> mi driving &middot; ~<strong>${totalDriveMin}</strong> min on the road<br>Est. total with 20-min visits: <strong>${totalHrs}h ${remainMin}m</strong></div>`;
+}
+
+function showRoute(){
+  document.querySelectorAll('.s-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.s-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('[data-panel="route-panel-wrap"]').classList.add('active');
+  document.getElementById('route-panel-wrap').classList.add('active');
+}
+
+function exportRoute(){
+  if(routeList.length===0)return;
+  const lines=routeList.map((id,i)=>{const p=PRACTICES.find(x=>x.id===id);return `${i+1}. ${p.name} - ${p.addr}, ${p.city}, ${p.state} ${p.zip} - ${p.phone}`});
+  document.getElementById('modal-title').textContent='Route Plan';
+  document.getElementById('modal-content').textContent=lines.join('\n');
+  document.getElementById('modal').classList.add('show');
+}
+
+// ═══════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════
+function updateDashboard(){
+  const el=document.getElementById('dash-panel');
+  const counts={new:0,reached:0,engaged:0,visited:0,active:0,declined:0};
+  const regionCounts={NYC:0,NJ:0,CT:0};
+  const emrCounts={};
+  PRACTICES.forEach(p=>{
+    const st=state[p.id]?.status||'new';counts[st]++;regionCounts[p.region]++;
+    if(p.emr!=='Unknown'){emrCounts[p.emr]=(emrCounts[p.emr]||0)+1}
+  });
+  const total=PRACTICES.length;
+  const touched=total-counts.new;
+
+  el.innerHTML=`
+    <div class="dash-grid">
+      <div class="dash-card"><div class="d-num" style="color:var(--accent2)">${total}</div><div class="d-lbl">Total Practices</div></div>
+      <div class="dash-card"><div class="d-num" style="color:var(--green)">${Math.round(touched/total*100)}%</div><div class="d-lbl">Coverage Rate</div></div>
+      <div class="dash-card"><div class="d-num" style="color:var(--blue)">${counts.visited+counts.active}</div><div class="d-lbl">Visited/Active</div></div>
+      <div class="dash-card"><div class="d-num" style="color:var(--text3)">${counts.new}</div><div class="d-lbl">Untouched</div></div>
+    </div>
+    <h4 style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin:12px 0 8px">Pipeline by Status</h4>
+    ${Object.entries(counts).map(([k,v])=>`
+      <div class="dash-bar">
+        <div class="dash-bar-label"><span>${k.charAt(0).toUpperCase()+k.slice(1)}</span><span>${v}</span></div>
+        <div class="dash-bar-track"><div class="dash-bar-fill" style="width:${(v/total*100)}%;background:${STATUS_COLORS[k]}"></div></div>
+      </div>
+    `).join('')}
+    <h4 style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin:16px 0 8px">By Region</h4>
+    ${Object.entries(regionCounts).map(([k,v])=>`
+      <div class="dash-bar">
+        <div class="dash-bar-label"><span>${k}</span><span>${v}</span></div>
+        <div class="dash-bar-track"><div class="dash-bar-fill" style="width:${(v/total*100)}%;background:${k==='NYC'?'var(--blue)':k==='NJ'?'var(--green)':'var(--purple)'}"></div></div>
+      </div>
+    `).join('')}
+    <h4 style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin:16px 0 8px">Known EMR Systems</h4>
+    ${Object.entries(emrCounts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
+      <div class="dash-bar">
+        <div class="dash-bar-label"><span>${k}</span><span>${v}</span></div>
+        <div class="dash-bar-track"><div class="dash-bar-fill" style="width:${(v/total*100)}%;background:var(--teal)"></div></div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function updateHeaderStats(){
+  const counts={new:0,reached:0,engaged:0,visited:0,active:0,declined:0};
+  PRACTICES.forEach(p=>{const st=state[p.id]?.status||'new';counts[st]++});
+  document.getElementById('hs-total').textContent=PRACTICES.length;
+  document.getElementById('hs-visited').textContent=counts.visited;
+  document.getElementById('hs-engaged').textContent=counts.engaged+counts.reached;
+  document.getElementById('hs-active').textContent=counts.active;
+  document.getElementById('hs-need').textContent=counts.new;
+}
+
+// ═══════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════
+function exportData(){
+  const headers=['Name','Address','City','State','Zip','Phone','Region','Borough','Doctors','Specialties','EMR','Independent','Website','Status','Last Contact','Next Follow-Up','Notes','Visits'];
+  const rows=PRACTICES.map(p=>{
+    const s=state[p.id]||{};
+    return [p.name,p.addr,p.city,p.state,p.zip,p.phone,p.region,p.borough||'',p.docs,p.specialties.join('; '),p.emr,p.independent?'Yes':'No',p.website||'',s.status||'new',s.lastContact||'',s.nextFollowUp||'',`"${(s.notes||'').replace(/"/g,'""')}"`,((s.visits||[]).join('; '))];
+  });
+  const csv=[headers.join(','),...rows.map(r=>r.join(','))].join('\n');
+  document.getElementById('modal-title').textContent='Export CSV';
+  document.getElementById('modal-content').textContent=csv;
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+function copyExport(){navigator.clipboard.writeText(document.getElementById('modal-content').textContent);alert('Copied to clipboard!')}
+
+// ═══════════════════════════════════════
+// ADD PRACTICE
+// ═══════════════════════════════════════
+function openAddPractice(){document.getElementById('add-modal').classList.add('show');document.getElementById('ap-name').focus()}
+function closeAddModal(){document.getElementById('add-modal').classList.remove('show');document.getElementById('geocode-result').innerHTML=''}
+
+async function geocodeAndAdd(){
+  const name=document.getElementById('ap-name').value.trim();
+  const addr=document.getElementById('ap-addr').value.trim();
+  const city=document.getElementById('ap-city').value.trim();
+  const st=document.getElementById('ap-state').value;
+  const zip=document.getElementById('ap-zip').value.trim();
+  if(!name||!addr||!city||!zip){document.getElementById('geocode-result').innerHTML='<div class="geocode-status geocode-err">Please fill in all required fields (*).</div>';return}
+
+  const btn=document.getElementById('ap-submit-btn');
+  btn.disabled=true;btn.textContent='Looking up address...';
+  document.getElementById('geocode-result').innerHTML='<div class="geocode-status geocode-wait">Geocoding address...</div>';
+
+  const query=`${addr}, ${city}, ${st} ${zip}`;
+  try{
+    const resp=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,{headers:{'User-Agent':'AmigoOrthoMap/1.0'}});
+    const data=await resp.json();
+    if(!data||data.length===0){
+      document.getElementById('geocode-result').innerHTML='<div class="geocode-status geocode-err">Could not find that address. Please double-check and try again, or enter a nearby address.</div>';
+      btn.disabled=false;btn.textContent='Look Up Address & Add';return;
+    }
+    const lat=parseFloat(data[0].lat);
+    const lng=parseFloat(data[0].lon);
+    addCustomPractice(name,addr,city,st,zip,lat,lng);
+  }catch(e){
+    document.getElementById('geocode-result').innerHTML=`<div class="geocode-status geocode-err">Geocoding failed: ${e.message}. Please try again.</div>`;
+    btn.disabled=false;btn.textContent='Look Up Address & Add';
+  }
+}
+
+function addCustomPractice(name,addr,city,st,zip,lat,lng){
+  const customs=loadCustomPractices();
+  const id='custom-'+(Date.now());
+  const phone=document.getElementById('ap-phone').value.trim();
+  const region=document.getElementById('ap-region').value;
+  const borough=document.getElementById('ap-borough').value.trim();
+  const docs=parseInt(document.getElementById('ap-docs').value)||1;
+  const emr=document.getElementById('ap-emr').value;
+  const website=document.getElementById('ap-website').value.trim();
+  const independent=document.getElementById('ap-independent').value==='true';
+  const specStr=document.getElementById('ap-specialties').value.trim();
+  const specialties=specStr?specStr.split(',').map(s=>s.trim()).filter(Boolean):['General Orthopedics'];
+
+  const practice={id,name,addr,city,state:st,zip,lat,lng,phone,region,borough:borough||'',docs,specialties,emr,website,independent,_custom:true};
+
+  customs.push(practice);
+  saveCustomPractices(customs);
+  PRACTICES.push(practice);
+
+  // Init state for new practice
+  state[id]={status:'new',notes:'',lastContact:'',nextFollowUp:'',visits:[]};
+  saveState();
+
+  // Refresh everything
+  createMarkers();filterPractices();updateDashboard();updateHeaderStats();
+
+  // Close modal and select new practice
+  closeAddModal();
+  // Reset form
+  document.getElementById('ap-name').value='';document.getElementById('ap-addr').value='';
+  document.getElementById('ap-city').value='';document.getElementById('ap-zip').value='';
+  document.getElementById('ap-phone').value='';document.getElementById('ap-borough').value='';
+  document.getElementById('ap-docs').value='1';document.getElementById('ap-website').value='';
+  document.getElementById('ap-specialties').value='';
+  document.getElementById('ap-submit-btn').disabled=false;
+  document.getElementById('ap-submit-btn').textContent='Look Up Address & Add';
+
+  selectPractice(id);
+  alert(`"${name}" has been added to your map!`);
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+loadState();
+createMarkers();
+drawCircles();
+filterPractices();
+updateDashboard();
+updateHeaderStats();
+renderRoute();
+</script>
+</body>
+</html>
